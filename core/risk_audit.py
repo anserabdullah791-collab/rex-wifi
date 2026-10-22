@@ -8,10 +8,10 @@ from core.wifi_info import get_wifi_status
 from core.devices import get_gateway
 
 _COMMON_PORTS = {
-    21: "FTP (خطرناک اگر کھلا ہو)", 22: "SSH", 23: "Telnet (بہت خطرناک!)",
+    21: "FTP (risky if open)", 22: "SSH", 23: "Telnet (very risky!)",
     25: "SMTP", 53: "DNS", 80: "HTTP admin", 443: "HTTPS admin",
     139: "NetBIOS", 445: "SMB", 1900: "UPnP", 2869: "UPnP-SSDP",
-    3389: "RDP (خطرناک اگر کھلا ہو)", 8080: "HTTP alt admin", 8443: "HTTPS alt admin",
+    3389: "RDP (risky if open)", 8080: "HTTP alt admin", 8443: "HTTPS alt admin",
     7547: "TR-069 ISP (check!)",
 }
 
@@ -62,16 +62,16 @@ def test_default_creds(gateway, progress=None):
             continue
         if "Basic" not in auth_hdr and status != 401:
             # No basic-auth gate; many routers use HTML login forms — can't test safely. Report that.
-            return None, None, f"{scheme.upper()} admin page موجود ہے مگر HTML فارم لاگ ان ہے — دستی طور پر خود چیک کریں"
-        if progress: progress(f"{scheme} basic-auth ٹیسٹ جاری...")
+            return None, None, f"{scheme.upper()} admin page uses an HTML login form — verify manually"
+        if progress: progress(f"{scheme} basic-auth test running...")
         for user, pwd in _DEFAULT_CREDS:
-            if progress: progress(f"آزمایش: {user} / {'*' * len(pwd) or '(خالی)'}")
+            if progress: progress(f"Trying: {user} / {'*' * len(pwd) or '(empty)'}")
             try:
                 if _basic_auth(url, user, pwd):
-                    return True, f"{user} / {pwd}", f"{scheme.upper()} پر default password کام کر رہا ہے!"
+                    return True, f"{user} / {pwd}", f"Default password WORKS on {scheme.upper()}!"
             except Exception:
                 continue
-    return False, None, "کوئی عام default credential نہیں ملا (اچھی بات)"
+    return False, None, "No common default credential found (good)"
 
 def run_risk_audit(do_cred_test=False, progress=None):
     """Main audit. Returns dict with checks list + score + recommendations."""
@@ -84,27 +84,27 @@ def run_risk_audit(do_cred_test=False, progress=None):
     # 1) Encryption
     auth = (st or {}).get("auth", "")
     if "WPA3" in auth:
-        checks.append(("Encryption", "WPA3", "✅ بہترین", "پاس"))
+        checks.append(("Encryption", "WPA3", "Best available", "PASS"))
     elif "WPA2" in auth:
-        checks.append(("Encryption", "WPA2", "✅ اچھا (مگر WPA3 بہتر ہے)", "پاس"))
+        checks.append(("Encryption", "WPA2", "Good (WPA3 is better)", "PASS"))
         score -= 5
-        recs.append("ممکن ہو تو روٹر سیٹنگز میں WPA3 موڈ آن کریں")
+        recs.append("Enable WPA3 mode in router settings if available")
     elif "WEP" in auth:
-        checks.append(("Encryption", "WEP", "🚨 WEP توڑا جا سکتا ہے!", "فیل"))
+        checks.append(("Encryption", "WEP", "CRACKED encryption!", "FAIL"))
         score -= 40
-        recs.append("فوراً WPA2/WPA3 پر آ جائیں")
+        recs.append("Switch to WPA2/WPA3 immediately")
     elif "open" in auth.lower():
-        checks.append(("Encryption", "Open", "🚨 کوئی پاس ورڈ نہیں!", "فیل"))
+        checks.append(("Encryption", "Open", "NO password!", "FAIL"))
         score -= 50
-        recs.append("فوراً مضبوط پاس ورڈ لگائیں (WPA2/WPA3)")
+        recs.append("Set a strong password now (WPA2/WPA3)")
     else:
-        checks.append(("Encryption", auth or "نامعلوم (اتھرنٹ یا کیبل)", "⚠️ وائرلیس نہیں یا معلوم نہیں", "جانیں"))
+        checks.append(("Encryption", auth or "Unknown (ethernet or cable)", "Not wireless or unknown", "INFO"))
 
     if not gw:
-        return {"checks": checks, "score": max(score, 0), "recommendations": recs or ["سب ٹھیک ہے ✅"],
-                "gateway": "نہیں ملا"}
+        return {"checks": checks, "score": max(score, 0), "recommendations": recs or ["All good"],
+                "gateway": "not found"}
 
-    if progress: progress("روٹر پورٹس چیک ہو رہی ہیں...")
+    if progress: progress("Scanning router ports...")
     # 2) Gateway open ports
     open_ports = []
     for port, name in _COMMON_PORTS.items():
@@ -112,38 +112,38 @@ def run_risk_audit(do_cred_test=False, progress=None):
             open_ports.append((port, name))
     if any(p in (23, 21, 3389) for p, _ in open_ports):
         score -= 25
-        recs.append("Telnet/FTP/RDP روٹر پر بند کریں")
+        recs.append("Disable Telnet/FTP/RDP on the router")
     if (80, "HTTP admin") in open_ports and (443, "HTTPS admin") not in open_ports:
-        checks.append(("Admin Interface", "صرف HTTP (پلین ٹیکسٹ)", "⚠️ پاس ورڈ sniffing ممکن", "غور کریں"))
+        checks.append(("Admin Interface", "HTTP only (plaintext)", "Password sniffing possible", "REVIEW"))
         score -= 10
-        recs.append("روٹر ایڈمن صرف HTTPS یا LAN سے استعمال کریں")
-    checks.append(("Router Ports", ", ".join(f"{p}" for p, _ in open_ports) or "کوئی عام پورٹ کھلا نہیں",
-                   "✅" if not open_ports else "مذکورہ بالا پورٹس کھلی ہیں", "معلومات"))
+        recs.append("Use router admin over HTTPS or LAN only")
+    checks.append(("Router Ports", ", ".join(f"{p}" for p, _ in open_ports) or "No common ports open",
+                   "✅" if not open_ports else "listed ports are open", "INFO"))
 
     # 3) WPS note (client-side detection is limited; informative)
-    checks.append(("WPS", "نامعلوم (روٹر پیج سے تصدیق کریں)",
-                   "WPS PIN آن ہو تو بند کرنا بہتر ہے (push-button ہی استعمال کریں)", "مشورہ"))
-    if progress: progress("WPS/ایڈمن چیک مکمل...")
+    checks.append(("WPS", "Unknown (verify on router page)",
+                   "Disable WPS PIN if enabled (use push-button only)", "TIP"))
+    if progress: progress("WPS/admin check done...")
 
     # 4) Optional default-credential test (explicit consent only)
     cred_result = None
     if do_cred_test:
-        if progress: progress("Default-credential ٹیسٹ (آپ کے اپنے روٹر پر)...")
+        if progress: progress("Default-credential test (your own router)...")
         vuln, cred, detail = test_default_creds(gw, progress)
         cred_result = {"vulnerable": vuln, "cred": cred, "detail": detail}
         if vuln:
             score -= 35
-            checks.append(("Default Password", f"🚨 {cred}", detail, "فیل"))
-            recs.append("فوراً روٹر ایڈمن پاس ورڈ تبدیل کریں!")
+            checks.append(("Default Password", f"VULNERABLE: {cred}", detail, "FAIL"))
+            recs.append("Change the router admin password NOW!")
         elif vuln is None:
-            checks.append(("Default Password", "جائزہ نہیں ہو سکا", detail, "دستی چیک"))
+            checks.append(("Default Password", "Could not test", detail, "MANUAL"))
         else:
-            checks.append(("Default Password", "default نہیں ملا", "✅ اچھی بات", "پاس"))
+            checks.append(("Default Password", "No default found", "Good", "PASS"))
 
     return {
         "gateway": gw,
         "checks": checks,
         "score": max(min(score, 100), 0),
-        "recommendations": recs or ["سب ٹھیک ہے ✅ — کوئی بڑا خطرہ نہیں ملا"],
+        "recommendations": recs or ["All good — no major risks found"],
         "cred_test": cred_result,
     }

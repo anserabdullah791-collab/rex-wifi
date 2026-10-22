@@ -150,10 +150,10 @@ def scan_network(progress=None):
     """Full device scan of your LAN. Returns list of dicts."""
     local_ip, gw = get_local_ip_and_subnet()
     if not local_ip or local_ip.startswith("127."):
-        return [], "کوئی نیٹ ورک نہیں ملا"
+        return [], "No network found"
     # /24 subnet of the local IP
     subnet = ".".join(local_ip.split(".")[:3]) + ".0/24"
-    if progress: progress(f"نیٹ ورک {subnet} اسکین ہو رہا ہے...")
+    if progress: progress(f"Scanning subnet {subnet}...")
     live = sweep(subnet, progress=progress)
     table = arp_table()
     devices = []

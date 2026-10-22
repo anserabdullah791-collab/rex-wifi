@@ -27,7 +27,7 @@ def get_wifi_status():
     if OS == "Windows":
         t = _run(["netsh", "wlan", "show", "interfaces"])
         if "There is no wireless interface" in t or not t:
-            return {"connected": False, "reason": "کوئی WiFi adapter نہیں ملا یا netsh دستیاب نہیں"}
+            return {"connected": False, "reason": "No WiFi adapter found or netsh unavailable"}
         d = _parse_netsh_table(t)
         return {
             "connected": d.get("State", "").lower() == "connected",
@@ -59,7 +59,7 @@ def get_wifi_status():
                     "cipher": "",
                     "radio": "", "state": "connected", "rx_rate": "", "tx_rate": "",
                 }
-        return {"connected": False, "reason": "nmcli سے فعال WiFi نہیں ملا"}
+        return {"connected": False, "reason": "No active WiFi found via nmcli"}
 
 def list_saved_profiles():
     """Saved WiFi profile names on THIS machine."""
@@ -84,7 +84,7 @@ def get_profile_password(profile_name):
         t = _run(["netsh", "wlan", "show", "profile",
                   f'name="{profile_name}"', "key=clear"])
         d = _parse_netsh_table(t)
-        return d.get("Key Content", "(open / password نہیں ملا)")
+        return d.get("Key Content", "(open / no password found)")
     else:
         path = f"/etc/NetworkManager/system-connections/{profile_name}"
         try:
@@ -92,11 +92,11 @@ def get_profile_password(profile_name):
                 for line in f:
                     if line.strip().startswith("psk="):
                         return line.split("=", 1)[1].strip()
-            return "(psk موجود نہیں)"
+            return "(no psk field)"
         except PermissionError:
-            return "(root درکار: sudo python main.py --cli)"
+            return "(root required: sudo python main.py --cli)"
         except Exception:
-            return "(پڑھ نہیں سکا)"
+            return "(could not read)"
 
 def get_all_saved_passwords():
     """[(profile, password), ...] for every saved profile."""

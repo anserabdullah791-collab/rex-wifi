@@ -75,13 +75,13 @@ def measure_upload(duration=8.0):
 
 def run_speed_test(progress=None):
     """Full speed test. progress=callable(str) for UI updates."""
-    if progress: progress("Ping/jitter چیک ہو رہا ہے...")
+    if progress: progress("Measuring ping/jitter...")
     ping, jitter, fails = measure_ping_jitter()
-    if progress: progress("ڈاؤن لوڈ سپیڈ ٹیسٹ (~8 سیکنڈ)...")
+    if progress: progress("Download test (~8s)...")
     down = measure_download()
-    if progress: progress("اپ لوڈ سپیڈ ٹیسٹ (~8 سیکنڈ)...")
+    if progress: progress("Upload test (~8s)...")
     up = measure_upload()
-    if progress: progress("مکمل ✅")
+    if progress: progress("Done ✅")
     return {"ping": ping, "jitter": jitter, "timeouts": fails,
             "download": down, "upload": up}
 
@@ -89,7 +89,7 @@ def quality_grade(ping, jitter, loss_pct):
     """Letter grade for connection quality."""
     score = 100
     if ping is None:
-        return "?", "پیمائش ناکام"
+        return "?", "measurement failed"
     if ping > 150: score -= 30
     elif ping > 80: score -= 15
     elif ping > 40: score -= 5
@@ -97,9 +97,9 @@ def quality_grade(ping, jitter, loss_pct):
     elif jitter and jitter > 15: score -= 10
     if loss_pct and loss_pct > 20: score -= 30
     elif loss_pct and loss_pct > 5: score -= 15
-    if score >= 90: g = "A+ (بہترین)"
-    elif score >= 80: g = "A (اچھی)"
-    elif score >= 65: g = "B (قابلِ قبول)"
-    elif score >= 45: g = "C (درمیانہ)"
-    else: g = "D (خراب)"
+    if score >= 90: g = "A+ (Excellent)"
+    elif score >= 80: g = "A (Good)"
+    elif score >= 65: g = "B (Acceptable)"
+    elif score >= 45: g = "C (Average)"
+    else: g = "D (Poor)"
     return g, f"{score}/100"

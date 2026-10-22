@@ -19,7 +19,7 @@ import sys, os
 def main():
     if "--cli" in sys.argv or "--help" in sys.argv:
         from cli import run_cli
-        run_cli(sys.argv[1:])
+        run_cli(sys.argv[2:])
     else:
         try:
             from gui import run_gui
